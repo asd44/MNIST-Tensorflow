@@ -1,5 +1,8 @@
-import tensorflow as tf
 import progressbar
+import tensorflow as tf
+
+import freezer
+
 
 class mnist_application:
     def __init__(self, model, dataset):
@@ -45,12 +48,13 @@ class mnist_application:
                 ok += self.__classifier.evaluator.eval(feed_dict=self.__classifier.get_feed_dict(batch[0], batch[1], False))
             print("Précision : {0:.2f}%".format(100*ok/self.__dataset.eval.size))
 
+            freezer.freeze_model(logdir, "frozen.pb")
+
         train_writer.close()
         input("Press <ENTER> to continue")
 
 if __name__ == "__main__":
     from data_import import mnist_dataset
-    from model.cnn_model import CNN
     from model.mlp_model import MLP
 
     #Hyperparameter
@@ -59,5 +63,5 @@ if __name__ == "__main__":
 
     #Run app
     mnist = mnist_dataset("./input_data/")
-    app = mnist_application(CNN, mnist)
+    app = mnist_application(MLP, mnist)
     app.run()
