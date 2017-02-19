@@ -1,5 +1,6 @@
-import tensorflow as tf
 import progressbar
+import tensorflow as tf
+
 
 class mnist_application:
     def __init__(self, model, dataset):
@@ -40,7 +41,7 @@ class mnist_application:
 
             # Modles Evaluation
             ok = 0
-            batch_gen = self.__dataset.eval.get_batcher(100)
+            batch_gen = self.__dataset.eval.get_batcher(BATCH_SIZE)
             for batch in batch_gen:
                 ok += self.__classifier.evaluator.eval(feed_dict=self.__classifier.get_feed_dict(batch[0], batch[1], False))
             print("Précision : {0:.2f}%".format(100*ok/self.__dataset.eval.size))
@@ -51,7 +52,6 @@ class mnist_application:
 if __name__ == "__main__":
     from data_import import mnist_dataset
     from model.cnn_model import CNN
-    from model.mlp_model import MLP
 
     #Hyperparameter
     BATCH_SIZE = 60

@@ -1,4 +1,5 @@
 import tensorflow as tf
+
 from .mlp_model import MLPFactory
 
 
@@ -58,7 +59,7 @@ class CNN:
         self.__keepprob = tf.placeholder(tf.float32)
 
         # initial learning rate - step width - rate decrement - momentum
-        self.__training_param = [0.02, 500, 0.9, 0.9]
+        self.__training_param = [0.01, 1000, 0.9, 0.9]
 
     @property
     def model(self):
@@ -66,7 +67,8 @@ class CNN:
             return self.__model
         except AttributeError:
             cnn = CNNFactory.create_cnn(self.__ph_x, [[5, 32], [7, 64]], batch_normalize=True)
-            self.__model = MLPFactory.create_mlp(cnn, [512, self.__shape[1]])
+            drop = tf.nn.dropout(cnn, self.__keepprob)
+            self.__model = MLPFactory.create_mlp(drop, [512, self.__shape[1]])
 
         return self.__model
 
@@ -99,5 +101,5 @@ class CNN:
 
     def get_feed_dict(self, x_array, y_array, train=False):
         if train:
-           return {self.__ph_x: x_array, self.__ph_y: y_array, self.__keepprob: 0.99}
+           return {self.__ph_x: x_array, self.__ph_y: y_array, self.__keepprob: 0.5}
         return {self.__ph_x: x_array, self.__ph_y: y_array, self.__keepprob: 1.0}
