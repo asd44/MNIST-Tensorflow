@@ -1,4 +1,5 @@
 import tensorflow as tf
+
 from .mlp_model import MLPFactory
 
 
@@ -8,24 +9,43 @@ class CNNFactory:
         return tf.nn.max_pool(x, [1, 2, 2, 1], [1, 2, 2, 1], 'SAME')
 
     @staticmethod
-    def conv_layer(x, shape):
+    def conv_layer(x, shape, activation=tf.nn.relu):
         conv_w = MLPFactory.normal_var(shape)
         conv_b = MLPFactory.normal_var([shape[3]])
         conv = tf.nn.conv2d(x, conv_w, [1, 1, 1, 1], 'SAME')
-        return tf.nn.relu(tf.nn.bias_add(conv, conv_b))
+        return activation(tf.nn.bias_add(conv, conv_b))
 
     @staticmethod
-    def conv_pool_norm_layer(x, shape):
-        conv = CNNFactory.conv_layer(x, shape)
+    def conv_noramalized_layer(x, shape, activation=tf.nn.relu):
+        conv_w = MLPFactory.normal_var(shape)
+        conv = tf.nn.conv2d(x, conv_w, [1, 1, 1, 1], 'SAME')
+        bn = MLPFactory.batch_normalizer(conv)
+        return activation(bn)
+
+    @staticmethod
+    def conv_pool_localnorm_layer(x, shape, activation=tf.nn.relu):
+        conv = CNNFactory.conv_layer(x, shape, activation=activation)
         pool = CNNFactory.pool_2x2(conv)
         return tf.nn.local_response_normalization(pool)
 
     @staticmethod
-    def create_cnn(input, layers):
+    def conv_pool_batchnorm_layer(x, shape, activation=tf.nn.relu):
+        conv = CNNFactory.conv_noramalized_layer(x, shape, activation=activation)
+        return CNNFactory.pool_2x2(conv)
+
+    @staticmethod
+    def create_cnn(input, layers, activation=tf.nn.relu, batch_normalize=False):
         current_layers = input.get_shape().as_list()[3]
         current_tensor = input
+
+        if batch_normalize:
+            cpnl = CNNFactory.conv_pool_batchnorm_layer
+        else:
+            cpnl = CNNFactory.conv_pool_localnorm_layer
+
         for params in layers:
-            current_tensor = CNNFactory.conv_pool_norm_layer(current_tensor, [params[0], params[0], current_layers, params[1]])
+            current_tensor = cpnl(current_tensor, [params[0], params[0], current_layers, params[1]],
+                                  activation=activation)
             current_layers = params[1]
 
         return current_tensor
@@ -46,7 +66,7 @@ class CNN:
         try:
             return self.__model
         except AttributeError:
-            cnn = CNNFactory.create_cnn(self.__ph_x, [[5, 32], [7, 64]])
+            cnn = CNNFactory.create_cnn(self.__ph_x, [[5, 32], [7, 64]], batch_normalize=True)
             drop = tf.nn.dropout(cnn, self.__keepprob)
             self.__model = MLPFactory.create_mlp(drop, [512, self.__shape[1]])
 
@@ -81,5 +101,5 @@ class CNN:
 
     def get_feed_dict(self, x_array, y_array, train=False):
         if train:
-           return {self.__ph_x: x_array, self.__ph_y: y_array, self.__keepprob: 0.5} 
+           return {self.__ph_x: x_array, self.__ph_y: y_array, self.__keepprob: 0.5}
         return {self.__ph_x: x_array, self.__ph_y: y_array, self.__keepprob: 1.0}
