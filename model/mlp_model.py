@@ -7,21 +7,40 @@ class MLPFactory:
         return tf.Variable(tf.truncated_normal(shape, stddev=0.1), name=name, dtype=dtype)
 
     @staticmethod
+    def batch_normalizer(x):
+        input_shape = x.get_shape().as_list()[1:]
+        offset = MLPFactory.normal_var(input_shape)
+        scale = tf.Variable(tf.ones(input_shape))
+
+        mean, variance = tf.nn.moments(x, [0])
+        return tf.nn.batch_normalization(x, mean, variance, offset, scale, 1e-3)
+
+    @staticmethod
     def fully_connected_layer(x, shape):
         fcl_w = MLPFactory.normal_var(shape)
         fcl_b = MLPFactory.normal_var([shape[1]])
         return tf.matmul(x, fcl_w) + fcl_b
 
     @staticmethod
-    def create_mlp(input, layers):
+    def fully_connected_normalized_layer(x, shape):
+        fcl_w = MLPFactory.normal_var(shape)
+        return MLPFactory.batch_normalizer(tf.matmul(x, fcl_w))
+
+    @staticmethod
+    def create_mlp(input, layers, activation=tf.nn.relu, normalize=False):
         ''' that's shitty but i don't want to import np just for that '''
         current_synaps = 1
         for i in input.get_shape().as_list()[1:]:
             current_synaps *= i
 
+        if normalize:
+            fcl = MLPFactory.fully_connected_normalized_layer
+        else:
+            fcl = MLPFactory.fully_connected_layer
+
         current_tensor = tf.reshape(input, [-1, current_synaps])
         for params in layers[:-1]:
-            current_tensor = tf.nn.relu(MLPFactory.fully_connected_layer(current_tensor, [current_synaps, params]))
+            current_tensor = activation(fcl(current_tensor, [current_synaps, params]))
             current_synaps = params
 
         return MLPFactory.fully_connected_layer(current_tensor, [current_synaps, layers[-1]])
@@ -34,14 +53,14 @@ class MLP:
         self.__ph_y = tf.placeholder(y_dtype, shape=[None, shape[1]])
 
         #initial learning rate - step width - rate decrement
-        self.__training_param = [0.5, 1000, 0.9]
+        self.__training_param = [1.0, 500, 0.9]
         
     @property
     def model(self):
         try:
             return self.__model
         except AttributeError:
-            self.__model = MLPFactory.create_mlp(self.__ph_x, [128, 128, self.__shape[1]])
+            self.__model = MLPFactory.create_mlp(self.__ph_x, [128, 128, self.__shape[1]], normalize=True)
 
         return self.__model
 
